@@ -66,7 +66,9 @@ server.post("/login", (req, res) => {
 
         res.status(200).json({ message: `welcome ${user.username}`, token });
       } else {
-        res.status(401).json({ you: "shall not pass!!" });
+        res
+          .status(401)
+          .json({ message: "login and/or password are incorrect" });
       }
     })
     .catch(err => res.status(500).json(err));
