@@ -19,6 +19,10 @@ server.get("/", (req, res) => {
   res.send("sanity check");
 });
 
+server.get("/users", async (req, res) => {
+  const users = await db("users").select("id", "username");
+  res.status(200).json({ users });
+});
 //Sign up endpoint
 
 server.post("/signup", (req, res) => {
