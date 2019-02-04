@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const db = require("../database/db");
 const bcrypt = require("bcryptjs");
@@ -11,7 +13,7 @@ const server = express();
 server.use(helmet());
 server.use(express.json());
 server.use(morgan("short"));
-server.use(cors({ credentials: true, origin: "http://localhost:3000 " }));
+server.use(cors());
 
 server.get("/", (req, res) => {
   res.send("sanity check");
