@@ -28,7 +28,6 @@ function lock(req, res, next) {
         res.status(401).json({ message: "invalid token" });
       } else {
         req.decodedToken = decodedToken;
-        console.log(decodedToken);
         next();
       }
     });
@@ -103,8 +102,8 @@ server.post("/login", (req, res) => {
 });
 
 //Message endpoints
-server.get("/messages/:id", (req, res) => {
-  const { id } = req.params;
+server.get("/messages", lock, (req, res) => {
+  const { id } = req.decodedToken;
   db("users")
     .leftJoin("messages", "messages.user_id", "users.id")
     .where("user_id", id)
@@ -131,13 +130,6 @@ server.post("/messages", lock, (req, res) => {
     .catch(err => {
       res.status(500).json({ error: "Message could not be created" });
     });
-});
-
-server.get("/messages", async (req, res) => {
-  const messages = await db("messages");
-  where({ id: req.params.id }).first();
-
-  res.status(200).json(messages);
 });
 
 module.exports = server;
