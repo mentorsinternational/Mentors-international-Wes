@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const db = require("../database/db");
 const bcrypt = require("bcryptjs");
-const { protected, generateToken } = require("../config/tokenMiddleware");
+const { generateToken } = require("../config/tokenMiddleware");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
@@ -14,6 +14,26 @@ server.use(helmet());
 server.use(express.json());
 server.use(morgan("short"));
 server.use(cors());
+
+//middleware
+
+function lock(req, res, next) {
+  //auth token is normally sent in the Authorization header.
+  const token = req.headers.authorization;
+
+  if (token) {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decodedToken) => {
+      if (err) {
+        res.status(401).json({ message: "invalid token" });
+      } else {
+        req.decodedToken = decodedToken;
+        next();
+      }
+    });
+  } else {
+    res.status(401).json({ message: "no token provided" });
+  }
+}
 
 server.get("/", (req, res) => {
   res.send("sanity check");
@@ -81,8 +101,8 @@ server.post("/login", (req, res) => {
 });
 
 //Message endpoints
-server.get("/message", protected, (req, res) => {
-  db.getMessages()
+server.get("/message", (req, res) => {
+  db("messages")
     .then(messages => {
       res.json(messages);
     })
@@ -93,9 +113,10 @@ server.get("/message", protected, (req, res) => {
     });
 });
 
-server.post("/message", protected, (req, res) => {
+server.post("/message", (req, res) => {
   const newMessage = req.body;
-  db.addMessage(newMessage)
+  db("messages")
+    .insert(newMessage)
     .then(message => {
       res.json(message.id);
     })
@@ -103,4 +124,14 @@ server.post("/message", protected, (req, res) => {
       res.status(500).json({ error: "Message could not be created" });
     });
 });
+
+server.get("/user/message/:id", (req, res) => {
+  db("users")
+    .leftJoin("messages", "user_id", user.id)
+    .then(userInfo => {
+      res.send(userInfo);
+    })
+    .catch(err => console.log(err));
+});
+
 module.exports = server;
