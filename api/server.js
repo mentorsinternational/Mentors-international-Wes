@@ -7,6 +7,7 @@ const { generateToken } = require("../config/tokenMiddleware");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 
 const server = express();
 
@@ -27,6 +28,7 @@ function lock(req, res, next) {
         res.status(401).json({ message: "invalid token" });
       } else {
         req.decodedToken = decodedToken;
+        console.log(decodedToken);
         next();
       }
     });
@@ -101,37 +103,41 @@ server.post("/login", (req, res) => {
 });
 
 //Message endpoints
-server.get("/message", (req, res) => {
-  db("messages")
-    .then(messages => {
-      res.json(messages);
+server.get("/messages/:id", (req, res) => {
+  const { id } = req.params;
+  db("users")
+    .leftJoin("messages", "messages.user_id", "users.id")
+    .where("user_id", id)
+    .select("message_title", "message_content")
+    .then(userInfo => {
+      res.send(userInfo);
     })
-    .catch(err => {
-      res
-        .status(500)
-        .json({ message: "No messages were able to be retreived." });
-    });
+    .catch(err => console.log(err));
 });
 
-server.post("/message", (req, res) => {
-  const newMessage = req.body;
+server.post("/messages", lock, (req, res) => {
+  const { message_title, message_content } = req.body;
+  const { id } = req.decodedToken;
   db("messages")
-    .insert(newMessage)
-    .then(message => {
-      res.json(message.id);
+    .insert({
+      message_title,
+      message_content,
+      user_id: id
+    })
+    .where("user_id", id)
+    .then(messages => {
+      res.json({ message_title, message_content });
     })
     .catch(err => {
       res.status(500).json({ error: "Message could not be created" });
     });
 });
 
-server.get("/user/message/:id", (req, res) => {
-  db("users")
-    .leftJoin("messages", "user_id", user.id)
-    .then(userInfo => {
-      res.send(userInfo);
-    })
-    .catch(err => console.log(err));
+server.get("/messages", async (req, res) => {
+  const messages = await db("messages");
+  where({ id: req.params.id }).first();
+
+  res.status(200).json(messages);
 });
 
 module.exports = server;
