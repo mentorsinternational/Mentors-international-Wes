@@ -31,7 +31,7 @@ server.post("/signup", (req, res) => {
   userInfo.password = hash;
   if (req.body.username && req.body.password && req.body.name) {
     db("users")
-      .insert(userInfo)
+      .insert(userInfo, "id")
       .then(ids => {
         const id = ids[0];
         db("users")
@@ -46,9 +46,9 @@ server.post("/signup", (req, res) => {
           });
       })
       .catch(err => {
-        res
-          .status(500)
-          .json({ message: "The user could not be registered at this time." });
+        res.status(500).json({
+          message: "The user could not be registered at this time. Again"
+        });
       });
   } else {
     res.status(400).json({
