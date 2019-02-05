@@ -80,4 +80,27 @@ server.post("/login", (req, res) => {
     .catch(err => res.status(500).json(err));
 });
 
+//Message endpoints
+server.get("/message", protected, (req, res) => {
+  db.getMessages()
+    .then(messages => {
+      res.json(messages);
+    })
+    .catch(err => {
+      res
+        .status(500)
+        .json({ message: "No messages were able to be retreived." });
+    });
+});
+
+server.post("/message", protected, (req, res) => {
+  const newMessage = req.body;
+  db.addMessage(newMessage)
+    .then(message => {
+      res.json(message.id);
+    })
+    .catch(err => {
+      res.status(500).json({ error: "Message could not be created" });
+    });
+});
 module.exports = server;

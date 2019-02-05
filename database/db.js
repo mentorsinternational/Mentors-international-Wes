@@ -13,7 +13,15 @@ module.exports = {
       .where({ username: credentials.username })
       .first();
     return user;
+  },
+  getMessages: function() {
+    return db("messages");
+  },
+  addMessage: function(message) {
+    return db("messages")
+      .insert(message)
+      .then(ids => ({
+        id: ids[0]
+      }));
   }
 };
-
-module.exports = db;
