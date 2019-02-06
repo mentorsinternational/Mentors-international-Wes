@@ -179,7 +179,7 @@ server.post("/mentees", lock, (req, res) => {
     })
     .where("user_id", id)
     .then(mentees => {
-      res.json({ name, phone_number });
+      res.json({ mentee_name, phone_number });
     })
     .catch(err => {
       res.status(500).json({ error: "mentee could not be created" });
