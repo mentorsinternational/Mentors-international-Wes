@@ -132,4 +132,38 @@ server.post("/messages", lock, (req, res) => {
     });
 });
 
+//reminder endpoints
+
+server.get("/reminders", lock, (req, res) => {
+  const { id } = req.decodedToken;
+  db("users")
+    .leftJoin("reminders", "reminders.user_id", "users.id")
+    .where("user_id", id)
+    .select("reminder_title", "reminder_content")
+    .then(userInfo => {
+      res.send(userInfo);
+    })
+    .catch(err => {
+      res.status(500).json({ error: "reminders could not be received" });
+    });
+});
+
+server.post("/reminders", lock, (req, res) => {
+  const { reminder_title, reminder_content } = req.body;
+  const { id } = req.decodedToken;
+  db("reminders")
+    .insert({
+      reminder_title,
+      reminder_content,
+      user_id: id
+    })
+    .where("user_id", id)
+    .then(reminders => {
+      res.json({ reminder_title, reminder_content });
+    })
+    .catch(err => {
+      res.status(500).json({ error: "Reminder could not be created" });
+    });
+});
+
 module.exports = server;
