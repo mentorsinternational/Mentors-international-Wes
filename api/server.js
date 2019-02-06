@@ -109,7 +109,7 @@ server.get("/messages", lock, (req, res) => {
   db("users")
     .leftJoin("messages", "messages.user_id", "users.id")
     .where("user_id", id)
-    .select("message_title", "message_content")
+    .select("messages.id", "message_title", "message_content")
     .then(userInfo => {
       res.send(userInfo);
     })
@@ -134,13 +134,34 @@ server.post("/messages", lock, (req, res) => {
     });
 });
 
+server.delete("/messages/:id", lock, (req, res) => {
+  const { id } = req.params;
+  db("messages")
+    .where("messages.id", id)
+    .del()
+    .then(row => {
+      if (row) {
+        res.json({ message: "Message successfully removed" });
+      } else {
+        res
+          .status(404)
+          .json({ message: "Message could not be removed from database" });
+      }
+    })
+    .catch(err => {
+      res
+        .status(500)
+        .json({ message: "the message could not be deleted at this time" });
+    });
+});
+
 //mentees endpoints
 server.get("/mentees", lock, (req, res) => {
   const { id } = req.decodedToken;
   db("users")
     .leftJoin("mentees", "mentees.user_id", "users.id")
     .where("user_id", id)
-    .select("mentee_name", "phone_number")
+    .select("mentees.id", "mentee_name", "phone_number")
     .then(userInfo => {
       res.send(userInfo);
     })
@@ -148,11 +169,11 @@ server.get("/mentees", lock, (req, res) => {
 });
 
 server.post("/mentees", lock, (req, res) => {
-  const { name, phone_number } = req.body;
+  const { mentee_name, phone_number } = req.body;
   const { id } = req.decodedToken;
   db("mentees")
     .insert({
-      name,
+      mentee_name,
       phone_number,
       user_id: id
     })
@@ -161,7 +182,28 @@ server.post("/mentees", lock, (req, res) => {
       res.json({ name, phone_number });
     })
     .catch(err => {
-      res.status(500).json({ error: "Reminder could not be created" });
+      res.status(500).json({ error: "mentee could not be created" });
+    });
+});
+
+server.delete("/mentees/:id", lock, (req, res) => {
+  const { id } = req.params;
+  db("mentees")
+    .where("mentees.id", id)
+    .del()
+    .then(row => {
+      if (row) {
+        res.json({ message: "Mentee successfully removed" });
+      } else {
+        res
+          .status(404)
+          .json({ message: "Mentee could not be removed from database" });
+      }
+    })
+    .catch(err => {
+      res
+        .status(500)
+        .json({ message: "the mentee could not be deleted at this time" });
     });
 });
 
