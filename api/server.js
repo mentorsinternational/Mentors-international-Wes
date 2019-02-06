@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+// const twilio = require("twilio");
 const express = require("express");
 const db = require("../database/db");
 const bcrypt = require("bcryptjs");
@@ -15,6 +16,7 @@ server.use(helmet());
 server.use(express.json());
 server.use(morgan("short"));
 server.use(cors());
+// server.use(twilio);
 
 //middleware
 
@@ -132,34 +134,31 @@ server.post("/messages", lock, (req, res) => {
     });
 });
 
-//reminder endpoints
-
-server.get("/reminders", lock, (req, res) => {
+//mentees endpoints
+server.get("/mentees", lock, (req, res) => {
   const { id } = req.decodedToken;
   db("users")
-    .leftJoin("reminders", "reminders.user_id", "users.id")
+    .leftJoin("mentees", "mentees.user_id", "users.id")
     .where("user_id", id)
-    .select("reminder_title", "reminder_content")
+    .select("mentee_name", "phone_number")
     .then(userInfo => {
       res.send(userInfo);
     })
-    .catch(err => {
-      res.status(500).json({ error: "reminders could not be received" });
-    });
+    .catch(err => console.log(err));
 });
 
-server.post("/reminders", lock, (req, res) => {
-  const { reminder_title, reminder_content } = req.body;
+server.post("/mentees", lock, (req, res) => {
+  const { name, phone_number } = req.body;
   const { id } = req.decodedToken;
-  db("reminders")
+  db("mentees")
     .insert({
-      reminder_title,
-      reminder_content,
+      name,
+      phone_number,
       user_id: id
     })
     .where("user_id", id)
-    .then(reminders => {
-      res.json({ reminder_title, reminder_content });
+    .then(mentees => {
+      res.json({ name, phone_number });
     })
     .catch(err => {
       res.status(500).json({ error: "Reminder could not be created" });
