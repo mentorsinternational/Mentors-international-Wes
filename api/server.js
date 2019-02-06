@@ -3,10 +3,11 @@ require("dotenv").config();
 const express = require("express");
 const db = require("../database/db");
 const bcrypt = require("bcryptjs");
-const { protected, generateToken } = require("../config/tokenMiddleware");
+const { generateToken } = require("../config/tokenMiddleware");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 
 const server = express();
 
@@ -14,6 +15,26 @@ server.use(helmet());
 server.use(express.json());
 server.use(morgan("short"));
 server.use(cors());
+
+//middleware
+
+function lock(req, res, next) {
+  //auth token is normally sent in the Authorization header.
+  const token = req.headers.authorization;
+
+  if (token) {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decodedToken) => {
+      if (err) {
+        res.status(401).json({ message: "invalid token" });
+      } else {
+        req.decodedToken = decodedToken;
+        next();
+      }
+    });
+  } else {
+    res.status(401).json({ message: "no token provided" });
+  }
+}
 
 server.get("/", (req, res) => {
   res.send("sanity check");
@@ -78,6 +99,37 @@ server.post("/login", (req, res) => {
       }
     })
     .catch(err => res.status(500).json(err));
+});
+
+//Message endpoints
+server.get("/messages", lock, (req, res) => {
+  const { id } = req.decodedToken;
+  db("users")
+    .leftJoin("messages", "messages.user_id", "users.id")
+    .where("user_id", id)
+    .select("message_title", "message_content")
+    .then(userInfo => {
+      res.send(userInfo);
+    })
+    .catch(err => console.log(err));
+});
+
+server.post("/messages", lock, (req, res) => {
+  const { message_title, message_content } = req.body;
+  const { id } = req.decodedToken;
+  db("messages")
+    .insert({
+      message_title,
+      message_content,
+      user_id: id
+    })
+    .where("user_id", id)
+    .then(messages => {
+      res.json({ message_title, message_content });
+    })
+    .catch(err => {
+      res.status(500).json({ error: "Message could not be created" });
+    });
 });
 
 module.exports = server;
