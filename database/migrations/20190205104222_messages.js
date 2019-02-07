@@ -3,6 +3,7 @@ exports.up = function(knex, Promise) {
     table.increments();
     table.string("message_title").notNullable();
     table.string("message_content").notNullable();
+    table.string("schedule");
     table.integer("user_id").unsigned();
     table
       .foreign("user_id")

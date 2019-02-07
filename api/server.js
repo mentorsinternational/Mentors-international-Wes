@@ -1,6 +1,5 @@
 require("dotenv").config();
 
-// const twilio = require("twilio");
 const express = require("express");
 const db = require("../database/db");
 const bcrypt = require("bcryptjs");
@@ -9,14 +8,14 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-
+const client = require("twilio")(process.env.AUTH_SID, process.env.AUTH_TOKEN);
+const schedule = require("node-schedule");
 const server = express();
 
 server.use(helmet());
 server.use(express.json());
 server.use(morgan("short"));
 server.use(cors());
-// server.use(twilio);
 
 //middleware
 
@@ -37,6 +36,44 @@ function lock(req, res, next) {
     res.status(401).json({ message: "no token provided" });
   }
 }
+
+function sendMessage(phone_number, message) {
+  client.messages.create(
+    {
+      to: "+1" + phone_number,
+      from: process.env.FROM_NUMBER,
+      body: message
+    },
+    (err, message) => {
+      if (message) {
+        console.log("message sent");
+      } else {
+        console.log(err);
+      }
+    }
+  );
+}
+
+const schedules = {};
+
+server.get("/test", function(req, res) {
+  const text = sendMessage();
+  res.status(200).json({ text });
+});
+
+server.put("/test", function(req, res) {
+  const { phone, message_id, message } = req.body;
+  db("messages")
+    .where("id", message_id)
+    .update("schedule", schedule);
+  if (schedules[message_id]) {
+    schedules[message_id].cancel();
+  }
+  schedules[message_id] = schedule.scheduleJob("* * * * *", () =>
+    sendMessage(phone, "id " + message_id + ": " + message)
+  );
+  res.json("Schedule Intiated.");
+});
 
 server.get("/", (req, res) => {
   res.send("sanity check");
