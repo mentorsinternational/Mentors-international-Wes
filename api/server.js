@@ -8,7 +8,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-// const client = require("twilio")(process.env.AUTH_SID, process.env.AUTH_TOKEN);
+const client = require("twilio")(process.env.AUTH_SID, process.env.AUTH_TOKEN);
 const schedule = require("node-schedule");
 const server = express();
 
@@ -37,60 +37,41 @@ function lock(req, res, next) {
   }
 }
 
-// function sendMessage(phone_number, message) {
-//   client.messages.create(
-//     {
-//       to: "+1" + phone_number,
-//       from: process.env.FROM_NUMBER,
-//       body: message
-//     },
-//     (err, message) => {
-//       if (message) {
-//         console.log("message sent");
-//       } else {
-//         console.log(err);
-//       }
-//     }
-//   );
-// }
+function sendMessage(phoneNumbers, message) {
+  phoneNumbers.forEach(number => {
+    client.messages.create(
+      {
+        to: "+1" + number,
+        from: process.env.FROM_NUMBER,
+        body: message
+      },
+      (err, message) => {
+        if (message) {
+          console.log("message sent");
+        } else {
+          console.log(err);
+        }
+      }
+    );
+  });
+}
 
-// const schedules = {};
-// const date = new Date("* * * * *");
+const schedules = {};
+const initialize = async () => {
+  setupSchedules = await db("messages");
+  setupSchedules.forEach(setup => {
+    schedules[setup.id] = [];
+  });
+};
 
-// server.get("/test", function(req, res, next) {
-//   const text = sendMessage();
-//   res.status(200).json({ text });
-// });
-
-// server.put("/test", function(req, res) {
-//   const { phone, message_id, message, date } = req.body;
-//   const newSchedule = "* * * * *";
-//   // const date = new Date("* * * * *");
-//   db("messages")
-//     .where("id", message_id)
-//     .update("schedule", newSchedule)
-//     .then(() => {
-//       if (schedules[message_id]) {
-//         schedules[message_id].cancel();
-//       }
-//       schedules[message_id] = schedule.scheduleJob("* * * * *", () =>
-//         sendMessage(phone, "id " + message_id + ": " + message)
-//       );
-//       res.json("Schedule Intiated.");
-//     })
-//     .catch(err => {
-//       res.status(500).json({
-//         message: "Schedule unable to be initiated"
-//       });
-//     });
-// });
+initialize();
 
 server.get("/", (req, res) => {
   res.send("sanity check");
 });
 
 server.get("/users", async (req, res) => {
-  const users = await db("users").select("id", "username");
+  const users = await db("users").select("id", "username", "password");
   res.status(200).json({ users });
 });
 
@@ -158,6 +139,8 @@ server.post("/login", (req, res) => {
 server.put("/users/:id", lock, (req, res) => {
   const { id } = req.params;
   const users = req.body;
+  const hash = bcrypt.hashSync(users.password, 12);
+  users.password = hash;
   if (users.name || users.password) {
     db("users")
       .where("id", id)
@@ -194,22 +177,49 @@ server.get("/messages", lock, (req, res) => {
     .catch(err => console.log(err));
 });
 
-//Post a new message from user(Mentor)
-server.post("/messages", lock, (req, res) => {
-  const { message_title, message_content } = req.body;
+//Post a new message from user(Mentor) *
+server.post("/messages", lock, async (req, res) => {
   const { id } = req.decodedToken;
+  let { message_title, message_content, dates } = req.body;
+  dates = dates.map(date => {
+    date.date = new Date(date.date);
+    if (date.every_week) {
+      // Convert to Weekly Cron Reminders
+      return `${date.date.getMinutes()} ${date.date.getHours()} * * ${date.date.getDay()}`;
+    } else {
+      return new Date(date.date);
+    }
+  });
+  // const messageData = await db("messages").where("id", id);
+  const menteeData = await db("mentees").where("user_id", id);
+  const menteePhoneNumbers = menteeData.map(mentee => mentee.phone_number);
+
   db("messages")
     .insert({
       message_title,
       message_content,
-      user_id: id
+      user_id: id,
+      schedule: JSON.stringify(dates)
     })
     .where("user_id", id)
-    .then(messages => {
-      res.json({ message_title, message_content });
+    .then(_ => {
+      // Assign the New Schedule
+      schedules[id] = dates.map(date =>
+        schedule.scheduleJob(date, () =>
+          sendMessage(
+            menteePhoneNumbers,
+            "Mentors International Reminder: " + message_content
+          )
+        )
+      );
+      res.json({
+        success: "Reminder Successfully Scheduled"
+      });
     })
     .catch(err => {
-      res.status(500).json({ error: "Message could not be created" });
+      res
+        .status(404)
+        .json({ message: "message could not be created at this time" });
     });
 });
 
@@ -235,20 +245,57 @@ server.delete("/messages/:id", lock, (req, res) => {
     });
 });
 
-//edit a messages title or content on users account.
-server.put("/messages/:id", lock, (req, res) => {
+//edit a messages title or content on users account. *
+server.put("/messages/:id", async (req, res) => {
   const { id } = req.params;
-  const messages = req.body;
-  if (messages.message_content || messages.message_title) {
+  let { message_title, message_content, dates } = req.body;
+  dates = dates.map(date => {
+    date.date = new Date(date.date);
+    if (date.every_week) {
+      // Convert to Weekly Cron Reminders
+      return `${date.date.getMinutes()} ${date.date.getHours()} * * ${date.date.getDay()}`;
+    } else {
+      return new Date(date.date);
+    }
+  });
+  const messageData = await db("messages").where("id", id);
+  const menteeData = await db("mentees").where(
+    "user_id",
+    messageData[0].user_id
+  );
+  const menteePhoneNumbers = menteeData.map(mentee => mentee.phone_number);
+
+  if (message_content || message_title || dates) {
+    console.log(id);
+    console.log(dates);
+
     db("messages")
       .where("id", id)
-      .update(messages)
-      .then(row => {
-        if (row) {
-          res.status(201).json({ message: "Message content updated" });
-        } else {
-          res.status(404).json({ message: "this message doesn't exist" });
+      .update(
+        { message_title, message_content, schedule: JSON.stringify(dates) }
+        // "id"
+      )
+      .then(_ => {
+        // Check if Message has a Schedule, and Cancel It
+        if (schedules[id] && schedules[id].length > 0) {
+          schedules[id].forEach(schedule => {
+            schedule.cancel();
+          });
+          schedules[id] = [];
         }
+
+        // Assign the New Schedule
+        schedules[id] = dates.map(date =>
+          schedule.scheduleJob(date, () =>
+            sendMessage(
+              menteePhoneNumbers,
+              "Mentors International Reminder: " + message_content
+            )
+          )
+        );
+        res.json({
+          success: `Reminder Successfully Scheduled`
+        });
       })
       .catch(err => {
         res
@@ -297,9 +344,10 @@ server.get("/mentees/:id", lock, (req, res) => {
 });
 
 // create a new mentee
-server.post("/mentees", lock, (req, res) => {
+server.post("/mentees", lock, async (req, res) => {
   const { mentee_name, phone_number } = req.body;
   const { id } = req.decodedToken;
+
   db("mentees")
     .insert({
       mentee_name,
@@ -307,7 +355,38 @@ server.post("/mentees", lock, (req, res) => {
       user_id: id
     })
     .where("user_id", id)
-    .then(mentees => {
+    .then(async mentees => {
+      // Get all of the User's Messages and their Schedules
+      const messages = await db("messages")
+        .where("user_id", id)
+        .select("id", "schedule");
+
+      // Cancel All Jobs for All User's Messages
+      messages.forEach(message => {
+        if (schedules[message.id]) {
+          schedules[message.id].forEach(date => {
+            console.log(date);
+          });
+        }
+        schedules[message.id] = [];
+      });
+
+      const menteeData = await db("mentees").where("user_id", id);
+
+      const menteePhoneNumbers = menteeData.map(mentee => mentee.phone_number);
+
+      // Reschedule All Jobs for All User's Messages
+      messages.forEach(message => {
+        schedules[message.id] = JSON.parse(message.schedule).map(date =>
+          schedule.scheduleJob(date.date, () =>
+            sendMessage(
+              menteePhoneNumbers,
+              "Mentors International Reminder: " + message.message_content
+            )
+          )
+        );
+      });
+
       res.json({ mentee_name, phone_number });
     })
     .catch(err => {
@@ -321,8 +400,40 @@ server.delete("/mentees/:id", lock, (req, res) => {
   db("mentees")
     .where("mentees.id", id)
     .del()
-    .then(row => {
+    .then(async row => {
       if (row) {
+        // Get all of the User's Messages and their Schedules
+        const messages = await db("messages")
+          .where("user_id", id)
+          .select("id", "schedule");
+
+        // Cancel All Jobs for All User's Messages
+        messages.forEach(message => {
+          if (schedules[message.id]) {
+            schedules[message.id].forEach(date => {
+              console.log(date);
+            });
+          }
+          schedules[message.id] = [];
+        });
+
+        const menteeData = await db("mentees").where("user_id", id);
+
+        const menteePhoneNumbers = menteeData.map(
+          mentee => mentee.phone_number
+        );
+
+        // Reschedule All Jobs for All User's Messages
+        messages.forEach(message => {
+          schedules[message.id] = JSON.parse(message.schedule).map(date =>
+            schedule.scheduleJob(date.date, () =>
+              sendMessage(
+                menteePhoneNumbers,
+                "Mentors International Reminder: " + message.message_content
+              )
+            )
+          );
+        });
         res.json({ message: "Mentee successfully removed" });
       } else {
         res
@@ -345,8 +456,40 @@ server.put("/mentees/:id", lock, (req, res) => {
     db("mentees")
       .where("id", id)
       .update(mentees)
-      .then(row => {
+      .then(async row => {
         if (row) {
+          // Get all of the User's Messages and their Schedules
+          const messages = await db("messages")
+            .where("user_id", id)
+            .select("id", "schedule");
+
+          // Cancel All Jobs for All User's Messages
+          messages.forEach(message => {
+            if (schedules[message.id]) {
+              schedules[message.id].forEach(date => {
+                console.log(date);
+              });
+            }
+            schedules[message.id] = [];
+          });
+
+          const menteeData = await db("mentees").where("user_id", id);
+
+          const menteePhoneNumbers = menteeData.map(
+            mentee => mentee.phone_number
+          );
+
+          // Reschedule All Jobs for All User's Messages
+          messages.forEach(message => {
+            schedules[message.id] = JSON.parse(message.schedule).map(date =>
+              schedule.scheduleJob(date.date, () =>
+                sendMessage(
+                  menteePhoneNumbers,
+                  "Mentors International Reminder: " + message.message_content
+                )
+              )
+            );
+          });
           res.status(201).json({ message: "Mentee info updated" });
         } else {
           res.status(404).json({ message: "this mentee doesn't exist" });
