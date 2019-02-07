@@ -69,7 +69,7 @@ server.put("/test", function(req, res) {
   db("messages")
     .where("id", message_id)
     .update("schedule", newSchedule)
-    .then( _ => {
+    .then(() => {
       if (schedules[message_id]) {
         schedules[message_id].cancel();
       }
@@ -77,10 +77,11 @@ server.put("/test", function(req, res) {
         sendMessage(phone, "id " + message_id + ": " + message)
       );
       res.json("Schedule Intiated.");
-    }
-  ).catch(err => {
-    res.status(500).json({
-      message: "the schedule didn't initiate"
+    })
+    .catch(err => {
+      res.status(500).json({
+        message: "Schedule unable to be initiated"
+      });
     });
 });
 
@@ -92,6 +93,7 @@ server.get("/users", async (req, res) => {
   const users = await db("users").select("id", "username");
   res.status(200).json({ users });
 });
+
 //Sign up endpoint
 
 server.post("/signup", (req, res) => {
@@ -139,7 +141,12 @@ server.post("/login", (req, res) => {
         //login is successful, create the token.
         const token = generateToken(user);
 
-        res.status(200).json({ message: `welcome ${user.username}`, token });
+        res
+          .status(200)
+          .json({
+            message: `welcome ${user.username} your id is ${user.id}`,
+            token
+          });
       } else {
         res
           .status(401)
@@ -149,7 +156,34 @@ server.post("/login", (req, res) => {
     .catch(err => res.status(500).json(err));
 });
 
+//Editing a mentors information
+server.put("/users/:id", lock, (req, res) => {
+  const { id } = req.params;
+  const users = req.body;
+  if (users.name || users.password) {
+    db("users")
+      .where("id", id)
+      .update(users)
+      .then(row => {
+        if (row) {
+          res.status(201).json({ message: "Mentor info updated" });
+        } else {
+          res.status(404).json({ message: "this mentor doesn't exist" });
+        }
+      })
+      .catch(err => {
+        res
+          .status(404)
+          .json({ message: "the mentors info cannot be updated at this time" });
+      });
+  } else {
+    res.status(400).json({ message: "Need to include new name or password" });
+  }
+});
+
 //Message endpoints
+
+// Get all user messages
 server.get("/messages", lock, (req, res) => {
   const { id } = req.decodedToken;
   db("users")
@@ -162,6 +196,7 @@ server.get("/messages", lock, (req, res) => {
     .catch(err => console.log(err));
 });
 
+//Post a new message from user(Mentor)
 server.post("/messages", lock, (req, res) => {
   const { message_title, message_content } = req.body;
   const { id } = req.decodedToken;
@@ -180,6 +215,7 @@ server.post("/messages", lock, (req, res) => {
     });
 });
 
+//delete a specific message from users account
 server.delete("/messages/:id", lock, (req, res) => {
   const { id } = req.params;
   db("messages")
@@ -201,7 +237,8 @@ server.delete("/messages/:id", lock, (req, res) => {
     });
 });
 
-server.put("/messages/:id", (req, res) => {
+//edit a messages title or content on users account.
+server.put("/messages/:id", lock, (req, res) => {
   const { id } = req.params;
   const messages = req.body;
   if (messages.message_content || messages.message_title) {
@@ -228,6 +265,8 @@ server.put("/messages/:id", (req, res) => {
 });
 
 //mentees endpoints
+
+//Get list of mentees
 server.get("/mentees", lock, (req, res) => {
   const { id } = req.decodedToken;
   db("users")
@@ -240,6 +279,26 @@ server.get("/mentees", lock, (req, res) => {
     .catch(err => console.log(err));
 });
 
+// Get single mentee
+server.get("/mentees/:id", lock, (req, res) => {
+  const { id } = req.params;
+  db("mentees")
+    .where("id", id)
+    .select("mentees.id", "mentee_name", "phone_number")
+    .then(rows => {
+      if (rows.length > 0) {
+        res.json(rows);
+      } else {
+        res.status(404).json({ message: "This mentee does not exist" });
+      }
+    })
+    .catch(err => {
+      console.log(err);
+      res.status(500).json({ message: "No mentee information was received" });
+    });
+});
+
+// create a new mentee
 server.post("/mentees", lock, (req, res) => {
   const { mentee_name, phone_number } = req.body;
   const { id } = req.decodedToken;
@@ -258,6 +317,7 @@ server.post("/mentees", lock, (req, res) => {
     });
 });
 
+//delete a specific mentee
 server.delete("/mentees/:id", lock, (req, res) => {
   const { id } = req.params;
   db("mentees")
@@ -279,4 +339,30 @@ server.delete("/mentees/:id", lock, (req, res) => {
     });
 });
 
+// edit a mentees data
+server.put("/mentees/:id", lock, (req, res) => {
+  const { id } = req.params;
+  const mentees = req.body;
+  if (mentees.mentee_name || mentees.phone_number) {
+    db("mentees")
+      .where("id", id)
+      .update(mentees)
+      .then(row => {
+        if (row) {
+          res.status(201).json({ message: "Mentee info updated" });
+        } else {
+          res.status(404).json({ message: "this mentee doesn't exist" });
+        }
+      })
+      .catch(err => {
+        res
+          .status(404)
+          .json({ message: "the mentees info cannot be updated at this time" });
+      });
+  } else {
+    res
+      .status(400)
+      .json({ message: "Need to include new mentee_name or phone_number" });
+  }
+});
 module.exports = server;
