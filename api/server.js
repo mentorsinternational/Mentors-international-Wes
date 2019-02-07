@@ -8,7 +8,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const client = require("twilio")(process.env.AUTH_SID, process.env.AUTH_TOKEN);
+// const client = require("twilio")(process.env.AUTH_SID, process.env.AUTH_TOKEN);
 const schedule = require("node-schedule");
 const server = express();
 
@@ -37,53 +37,53 @@ function lock(req, res, next) {
   }
 }
 
-function sendMessage(phone_number, message) {
-  client.messages.create(
-    {
-      to: "+1" + phone_number,
-      from: process.env.FROM_NUMBER,
-      body: message
-    },
-    (err, message) => {
-      if (message) {
-        console.log("message sent");
-      } else {
-        console.log(err);
-      }
-    }
-  );
-}
+// function sendMessage(phone_number, message) {
+//   client.messages.create(
+//     {
+//       to: "+1" + phone_number,
+//       from: process.env.FROM_NUMBER,
+//       body: message
+//     },
+//     (err, message) => {
+//       if (message) {
+//         console.log("message sent");
+//       } else {
+//         console.log(err);
+//       }
+//     }
+//   );
+// }
 
-const schedules = {};
-const date = new Date("* * * * *");
+// const schedules = {};
+// const date = new Date("* * * * *");
 
-server.get("/test", function(req, res, next) {
-  const text = sendMessage();
-  res.status(200).json({ text });
-});
+// server.get("/test", function(req, res, next) {
+//   const text = sendMessage();
+//   res.status(200).json({ text });
+// });
 
-server.put("/test", function(req, res) {
-  const { phone, message_id, message, date } = req.body;
-  const newSchedule = "* * * * *";
-  // const date = new Date("* * * * *");
-  db("messages")
-    .where("id", message_id)
-    .update("schedule", newSchedule)
-    .then(() => {
-      if (schedules[message_id]) {
-        schedules[message_id].cancel();
-      }
-      schedules[message_id] = schedule.scheduleJob("* * * * *", () =>
-        sendMessage(phone, "id " + message_id + ": " + message)
-      );
-      res.json("Schedule Intiated.");
-    })
-    .catch(err => {
-      res.status(500).json({
-        message: "Schedule unable to be initiated"
-      });
-    });
-});
+// server.put("/test", function(req, res) {
+//   const { phone, message_id, message, date } = req.body;
+//   const newSchedule = "* * * * *";
+//   // const date = new Date("* * * * *");
+//   db("messages")
+//     .where("id", message_id)
+//     .update("schedule", newSchedule)
+//     .then(() => {
+//       if (schedules[message_id]) {
+//         schedules[message_id].cancel();
+//       }
+//       schedules[message_id] = schedule.scheduleJob("* * * * *", () =>
+//         sendMessage(phone, "id " + message_id + ": " + message)
+//       );
+//       res.json("Schedule Intiated.");
+//     })
+//     .catch(err => {
+//       res.status(500).json({
+//         message: "Schedule unable to be initiated"
+//       });
+//     });
+// });
 
 server.get("/", (req, res) => {
   res.send("sanity check");
@@ -141,12 +141,10 @@ server.post("/login", (req, res) => {
         //login is successful, create the token.
         const token = generateToken(user);
 
-        res
-          .status(200)
-          .json({
-            message: `welcome ${user.username} your id is ${user.id}`,
-            token
-          });
+        res.status(200).json({
+          message: `welcome ${user.username} your id is ${user.id}`,
+          token
+        });
       } else {
         res
           .status(401)
@@ -365,4 +363,5 @@ server.put("/mentees/:id", lock, (req, res) => {
       .json({ message: "Need to include new mentee_name or phone_number" });
   }
 });
+
 module.exports = server;
