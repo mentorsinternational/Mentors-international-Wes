@@ -55,24 +55,33 @@ function sendMessage(phone_number, message) {
 }
 
 const schedules = {};
+const date = new Date("* * * * *");
 
-server.get("/test", function(req, res) {
+server.get("/test", function(req, res, next) {
   const text = sendMessage();
   res.status(200).json({ text });
 });
 
 server.put("/test", function(req, res) {
-  const { phone, message_id, message } = req.body;
+  const { phone, message_id, message, date } = req.body;
+  const newSchedule = "* * * * *";
+  // const date = new Date("* * * * *");
   db("messages")
     .where("id", message_id)
-    .update("schedule", schedule);
-  if (schedules[message_id]) {
-    schedules[message_id].cancel();
-  }
-  schedules[message_id] = schedule.scheduleJob("* * * * *", () =>
-    sendMessage(phone, "id " + message_id + ": " + message)
-  );
-  res.json("Schedule Intiated.");
+    .update("schedule", newSchedule)
+    .then( _ => {
+      if (schedules[message_id]) {
+        schedules[message_id].cancel();
+      }
+      schedules[message_id] = schedule.scheduleJob("* * * * *", () =>
+        sendMessage(phone, "id " + message_id + ": " + message)
+      );
+      res.json("Schedule Intiated.");
+    }
+  ).catch(err => {
+    res.status(500).json({
+      message: "the schedule didn't initiate"
+    });
 });
 
 server.get("/", (req, res) => {
@@ -190,6 +199,32 @@ server.delete("/messages/:id", lock, (req, res) => {
         .status(500)
         .json({ message: "the message could not be deleted at this time" });
     });
+});
+
+server.put("/messages/:id", (req, res) => {
+  const { id } = req.params;
+  const messages = req.body;
+  if (messages.message_content || messages.message_title) {
+    db("messages")
+      .where("id", id)
+      .update(messages)
+      .then(row => {
+        if (row) {
+          res.status(201).json({ message: "Message content updated" });
+        } else {
+          res.status(404).json({ message: "this message doesn't exist" });
+        }
+      })
+      .catch(err => {
+        res
+          .status(404)
+          .json({ message: "the message cannot be updated at this time" });
+      });
+  } else {
+    res
+      .status(400)
+      .json({ message: "Need to include new message content/title" });
+  }
 });
 
 //mentees endpoints
