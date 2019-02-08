@@ -1,9 +1,9 @@
 exports.up = function(knex, Promise) {
-  return knex.schema.createTable("messages", table => {
+  return knex.schema.createTable("mentees", table => {
     table.increments();
-    table.string("message_title").notNullable();
-    table.string("message_content").notNullable();
-    table.string("schedule");
+
+    table.string("mentee_name").notNullable();
+    table.string("phone_number", 225).notNullable();
     table.integer("user_id").unsigned();
     table
       .foreign("user_id")
@@ -13,5 +13,5 @@ exports.up = function(knex, Promise) {
 };
 
 exports.down = function(knex, Promise) {
-  return knex.schema.dropTableIfExists("messages");
+  return knex.schema.dropTableIfExists("mentees");
 };
