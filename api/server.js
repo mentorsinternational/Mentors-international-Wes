@@ -184,10 +184,13 @@ server.post("/messages", lock, async (req, res) => {
   dates = dates.map(date => {
     date.date = new Date(date.date);
     if (date.every_week) {
-      // Convert to Weekly Cron Reminders
-      return `${date.date.getMinutes()} ${date.date.getHours()} * * ${date.date.getDay()}`;
+      return [
+        `${date.date.getMinutes()} ${date.date.getHours()} * * ${date.date.getDay()}, ${
+          date.every_week
+        }`
+      ];
     } else {
-      return new Date(date.date);
+      return [new Date(date.date), `${date.every_week}`];
     }
   });
   // const messageData = await db("messages").where("id", id);
@@ -253,7 +256,9 @@ server.put("/messages/:id", async (req, res) => {
     date.date = new Date(date.date);
     if (date.every_week) {
       // Convert to Weekly Cron Reminders
-      return `${date.date.getMinutes()} ${date.date.getHours()} * * ${date.date.getDay()}`;
+      return [
+        `${date.date.getMinutes()} ${date.date.getHours()} * * ${date.date.getDay()}`
+      ];
     } else {
       return new Date(date.date);
     }
