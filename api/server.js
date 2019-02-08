@@ -71,7 +71,7 @@ server.get("/", (req, res) => {
 });
 
 server.get("/users", async (req, res) => {
-  const users = await db("users").select("id", "username", "password");
+  const users = await db("users").select("id", "username", "name", "password");
   res.status(200).json({ users });
 });
 
@@ -167,10 +167,10 @@ server.put("/users/:id", lock, (req, res) => {
 // Get all user messages
 server.get("/messages", lock, (req, res) => {
   const { id } = req.decodedToken;
-  db("users")
-    .leftJoin("messages", "messages.user_id", "users.id")
+  db("messages")
+    // .leftJoin("messages", "messages.user_id", "users.id")
     .where("user_id", id)
-    .select("messages.id", "message_title", "message_content")
+    .select("messages.id", "message_title", "message_content", "schedule")
     .then(userInfo => {
       res.send(userInfo);
     })
