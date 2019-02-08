@@ -144,7 +144,7 @@ server.put("/users/:id", lock, (req, res) => {
   if (users.name || users.password) {
     db("users")
       .where("id", id)
-      .update(users)
+      .update(users, "id")
       .then(row => {
         if (row) {
           res.status(201).json({ message: "Mentor info updated" });
@@ -198,12 +198,15 @@ server.post("/messages", lock, async (req, res) => {
   const menteePhoneNumbers = menteeData.map(mentee => mentee.phone_number);
 
   db("messages")
-    .insert({
-      message_title,
-      message_content,
-      user_id: id,
-      schedule: JSON.stringify(dates)
-    })
+    .insert(
+      {
+        message_title,
+        message_content,
+        user_id: id,
+        schedule: JSON.stringify(dates)
+      },
+      "id"
+    )
     .where("user_id", id)
     .then(_ => {
       // Assign the New Schedule
@@ -277,8 +280,8 @@ server.put("/messages/:id", async (req, res) => {
     db("messages")
       .where("id", id)
       .update(
-        { message_title, message_content, schedule: JSON.stringify(dates) }
-        // "id"
+        { message_title, message_content, schedule: JSON.stringify(dates) },
+        "id"
       )
       .then(_ => {
         // Check if Message has a Schedule, and Cancel It
@@ -354,11 +357,14 @@ server.post("/mentees", lock, async (req, res) => {
   const { id } = req.decodedToken;
 
   db("mentees")
-    .insert({
-      mentee_name,
-      phone_number,
-      user_id: id
-    })
+    .insert(
+      {
+        mentee_name,
+        phone_number,
+        user_id: id
+      },
+      "id"
+    )
     .where("user_id", id)
     .then(async mentees => {
       // Get all of the User's Messages and their Schedules
@@ -460,7 +466,7 @@ server.put("/mentees/:id", lock, (req, res) => {
   if (mentees.mentee_name || mentees.phone_number) {
     db("mentees")
       .where("id", id)
-      .update(mentees)
+      .update(mentees, "id")
       .then(async row => {
         if (row) {
           // Get all of the User's Messages and their Schedules
